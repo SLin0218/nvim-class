@@ -1,22 +1,49 @@
-local get_current_file_path = function()
-  local current_buffer_id = vim.api.nvim_get_current_buf()
-  local current_file_path = vim.api.nvim_buf_get_name(current_buffer_id)
-  return current_file_path
-end
-
 -- java -jar fernflower.jar -dgs=1 c:\Temp\binary\library.jar c:\Temp\binary\Boot.class c:\Temp\source\
 
-print(get_current_file_path())
+local tmp = '/tmp/nvim-class/'
 
 local function decompile_class_file(file_path)
-  return '12345'
+  local jar = debug.getinfo(1, 'S').source:sub(2, -9) .. 'libs/fernflower.jar'
+  local jcmd = vim.fn.glob('/Library/Java/JavaVirtualMachines/*17*/Contents/Home/bin/java')
+  local end_index = string.find(string.reverse(file_path), '/')
+  local sub_path = string.gsub(file_path:sub(2, -end_index - 1), '/', '.')
+  local java_path = tmp .. sub_path
+  print(jar)
+  if vim.fn.isdirectory(java_path) == 0 then
+    os.execute('mkdir -p ' .. java_path)
+  end
+
+  if string.find(file_path, 'zipfile') == 1 then
+  else
+    os.execute(jcmd .. ' -jar ' .. jar .. " " .. file_path .. " " .. java_path)
+    print(jcmd .. ' -jar ' .. jar .. " " .. file_path .. " " .. java_path)
+  end
+  return vim.fn.readfile(java_path .. '')
+end
+-- zipfile:///Users/a1/Workspace/fernflower/build/libs/fernflower.jar::org/jetbrains/java/decompiler/modules/decompiler/MergeHelper.class
+
+local function replace_buffer(file_path)
+  local buf = vim.api.nvim_get_current_buf()
+  local decompiled_content = decompile_class_file(file_path)
+  if vim.api.nvim_buf_get_option(buf, 'modifiable') then
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, decompiled_content)
+    vim.api.nvim_buf_set_option(buf, 'modifiable', false)
+  end
 end
 
-vim.api.nvim_create_autocmd('BufReadPre', {
+vim.api.nvim_create_autocmd('BufRead', {
   pattern = '*.class',
   callback = function()
-    local file_path = vim.fn.expand('%:p') -- 获取 .class 文件的路径
-    local decompiled_content = decompile_class_file(file_path)
-    vim.api.nvim_buf_set_lines(0, 0, -1, false, decompiled_content)
+    local file_path = vim.fn.expand('%:p')
+    replace_buffer(file_path)
+  end,
+})
+
+vim.api.nvim_create_autocmd('BufEnter', {
+  callback = function()
+    local file_path = vim.fn.expand('%:p')
+    if string.find(file_path, 'zipfile') == 1 then
+      replace_buffer(file_path)
+    end
   end,
 })

@@ -3,22 +3,23 @@
 local tmp = '/tmp/nvim-class/'
 
 local function decompile_class_file(file_path)
-  local jar = debug.getinfo(1, 'S').source:sub(2, -9) .. 'libs/fernflower.jar'
+  local jar = debug.getinfo(1, 'S').source:sub(2, -24) .. 'libs/fernflower.jar'
   local jcmd = vim.fn.glob('/Library/Java/JavaVirtualMachines/*17*/Contents/Home/bin/java')
   local end_index = string.find(string.reverse(file_path), '/')
   local sub_path = string.gsub(file_path:sub(2, -end_index - 1), '/', '.')
   local java_path = tmp .. sub_path
-  print(jar)
   if vim.fn.isdirectory(java_path) == 0 then
     os.execute('mkdir -p ' .. java_path)
   end
 
   if string.find(file_path, 'zipfile') == 1 then
+    print(1)
   else
-    os.execute(jcmd .. ' -jar ' .. jar .. " " .. file_path .. " " .. java_path)
-    print(jcmd .. ' -jar ' .. jar .. " " .. file_path .. " " .. java_path)
+    -- 内部类 命名转义
+    file_path = string.gsub(file_path, '%$', '\\$')
+    local _ = io.popen(jcmd .. ' -jar ' .. jar .. ' ' .. file_path .. ' ' .. java_path):read("*a")
   end
-  return vim.fn.readfile(java_path .. '')
+  return vim.fn.readfile(java_path .. '/' .. vim.fn.expand('%:t'):sub(0, -7) .. '.java')
 end
 -- zipfile:///Users/a1/Workspace/fernflower/build/libs/fernflower.jar::org/jetbrains/java/decompiler/modules/decompiler/MergeHelper.class
 

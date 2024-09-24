@@ -26,7 +26,6 @@ local function decompile_class_file(file_path)
   if is_jar then
     local decompile_jar = java_path .. '/' .. vim.fn.fnamemodify(file_path, ':t')
     if vim.fn.filereadable(decompile_jar) == 0 then
-      print('decompilation ' .. file_path)
       -- decompilation and unzip
       local _ = io.popen(
         jcmd
@@ -47,7 +46,6 @@ local function decompile_class_file(file_path)
     else
       sub_file = sub_file:gsub('class$', 'java')
     end
-    print(sub_file)
     return vim.fn.readfile(java_path .. '/' .. sub_file)
   else
     -- 内部类 命名转义

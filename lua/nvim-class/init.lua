@@ -1,10 +1,27 @@
 -- java -jar fernflower.jar -dgs=1 c:\Temp\binary\library.jar c:\Temp\binary\Boot.class c:\Temp\source\
+local M = {}
 
-local tmp = '/tmp/nvim-class/'
+local config = {
+  cache_dir = '/tmp/nvim-class/',
+}
+
+local uv = (vim.uv or vim.loop)
+local osname = uv.os_uname().sysname
+if osname == 'Darwin' then
+  config.java_cmd = vim.fn.glob('/Library/Java/JavaVirtualMachines/*17*/Contents/Home/bin/java')
+elseif osname == 'Linux' then
+  if uv.os_uname().release:find('arch') then
+    config.java_cmd = vim.fn.glob('/usr/lib/jvm/*17*/bin/java')
+  end
+end
+
+M.setup = function(args)
+  args = args == nil and {} or args
+  config = vim.tbl_deep_extend('force', config, args)
+end
 
 local function decompile_class_file(file_path)
   local jar = debug.getinfo(1, 'S').source:sub(2, -24) .. 'libs/fernflower.jar'
-  local jcmd = vim.fn.glob('/Library/Java/JavaVirtualMachines/*17*/Contents/Home/bin/java')
   local is_jar = string.find(file_path, 'zipfile') == 1
   local java_path = ''
 
@@ -12,11 +29,11 @@ local function decompile_class_file(file_path)
   if is_jar then
     sub_file = file_path:sub(file_path:find('::') + 2, file_path:len())
     file_path = string.sub(file_path, 11, string.find(file_path, '::') - 1)
-    java_path = tmp .. string.gsub(file_path:sub(2, -5), '/', '.')
+    java_path = config.cache_dir .. string.gsub(file_path:sub(2, -5), '/', '.')
   else
     local end_index = string.find(string.reverse(file_path), '/')
     local sub_path = string.gsub(file_path:sub(2, -end_index - 1), '/', '.')
-    java_path = tmp .. sub_path
+    java_path = config.cache_dir .. sub_path
   end
 
   if vim.fn.isdirectory(java_path) == 0 then
@@ -28,7 +45,7 @@ local function decompile_class_file(file_path)
     if vim.fn.filereadable(decompile_jar) == 0 then
       -- decompilation and unzip
       local _ = io.popen(
-        jcmd
+        config.java_cmd
           .. ' -jar '
           .. jar
           .. ' '
@@ -50,13 +67,14 @@ local function decompile_class_file(file_path)
   else
     -- 内部类 命名转义
     file_path = string.gsub(file_path, '%$', '\\$')
-    local _ = io.popen(jcmd .. ' -jar ' .. jar .. ' ' .. file_path .. ' ' .. java_path):read('*a')
+    local _ = io.popen(config.java_cmd .. ' -jar ' .. jar .. ' ' .. file_path .. ' ' .. java_path)
+      :read('*a')
     return vim.fn.readfile(java_path .. '/' .. vim.fn.expand('%:t'):sub(0, -7) .. '.java')
   end
 end
 -- zipfile:///Users/a1/Workspace/fernflower/build/libs/fernflower.jar::org/jetbrains/java/decompiler/modules/decompiler/MergeHelper.class
 
-local function replace_buffer(file_path)
+M.replace_buffer = function(file_path)
   local buf = vim.api.nvim_get_current_buf()
   local decompiled_content = decompile_class_file(file_path)
   if vim.api.nvim_buf_get_option(buf, 'modifiable') then
@@ -66,19 +84,4 @@ local function replace_buffer(file_path)
   -- vim.api.nvim_buf_set_option(buf, 'ft', 'java')
 end
 
-vim.api.nvim_create_autocmd('BufRead', {
-  pattern = '*.class',
-  callback = function()
-    local file_path = vim.fn.expand('%:p')
-    replace_buffer(file_path)
-  end,
-})
-
-vim.api.nvim_create_autocmd('BufEnter', {
-  callback = function()
-    local file_path = vim.fn.expand('%:p')
-    if string.find(file_path, 'zipfile') == 1 then
-      replace_buffer(file_path)
-    end
-  end,
-})
+return M

@@ -30,6 +30,7 @@ local function replace_buffer(file_path)
     vim.api.nvim_buf_set_lines(buf, 0, -1, false, decompiled_content)
     vim.api.nvim_buf_set_option(buf, 'modifiable', false)
   end
+  vim.api.nvim_buf_set_option(buf, 'ft', 'java')
 end
 
 vim.api.nvim_create_autocmd('BufRead', {

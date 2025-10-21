@@ -77,11 +77,13 @@ end
 M.replace_buffer = function(file_path)
   local buf = vim.api.nvim_get_current_buf()
   local decompiled_content = decompile_class_file(file_path)
-  if vim.api.nvim_buf_get_option(buf, 'modifiable') then
-    vim.api.nvim_buf_set_lines(buf, 0, -1, false, decompiled_content)
-    vim.api.nvim_buf_set_option(buf, 'modifiable', false)
+  if vim.api.nvim_get_option_value('modifiable', { buf = buf }) then
+    vim.api.nvim_buf_set_lines(buf, 0, -1, true, {})
+    vim.api.nvim_buf_set_lines(buf, 0, 0, true, decompiled_content)
+    vim.api.nvim_set_option_value('modifiable', false, { buf = buf })
+    vim.api.nvim_set_option_value('modified', false, { buf = buf })
   end
-  -- vim.api.nvim_buf_set_option(buf, 'ft', 'java')
+  vim.api.nvim_set_option_value('filetype', 'java', { buf = buf })
 end
 
 return M
